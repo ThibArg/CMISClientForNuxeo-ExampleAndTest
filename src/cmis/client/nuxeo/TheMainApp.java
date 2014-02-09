@@ -74,13 +74,17 @@ public class TheMainApp {
     public static final boolean kONE_SESSION_FOR_ALL = true;
     public static final boolean kENABLE_CLIENT_CACHE = true; // ignored if kONE_SESSION_FOR_ALL is false
 
-    public static final boolean kDO_LOCALHOST = false;
-    public static final boolean kDO_DEMO_NUXEO_COM = true;
+    public static final boolean kDO_LOCALHOST = true;
+    public static final boolean kDO_DEMO_NUXEO_COM = false;
     public static final int kDEMO_NUXEO_COM_COUNT_OF_TESTS = 50;
 
     public static void main(String[] args) throws InterruptedException {
 
         do_buildDocNames();
+
+        if(!kDO_LOCALHOST && !kDO_DEMO_NUXEO_COM) {
+            System.out.println("Hmmmm. Basically, you are testing nothing: kDO_LOCALHOST and kDO_DEMO_NUXEO_COM are false");
+        }
 
         if(kDO_LOCALHOST) {
             System.out.println("<test_on_localhost>");
