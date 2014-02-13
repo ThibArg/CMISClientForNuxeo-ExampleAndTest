@@ -82,21 +82,28 @@ public class TheMainApp {
         System.out.println("--------------------------------------");
     }
      */
+    public static final int kSESSION_FOR_LOCALHOST = 1;
+    public static final int kSESSION_FOR_CMISTEST_REMOTEAWS = 2;
+    public static final int kSESSION_FOR_DEMO_NUXEO_COM = 3;
 
     public static final boolean kSAME_DOC_FOR_ALL = false;
     public static final boolean kONE_SESSION_FOR_ALL = true;
     public static final boolean kENABLE_CLIENT_CACHE = false; // ignored if kONE_SESSION_FOR_ALL is false
     public static final boolean kUSE_WITH_TITLE_DIFF_NAME = false; // dc:title == or != name
 
-    public static final boolean kDO_LOCALHOST = false;//true;
+    public static final boolean kDO_LOCALHOST = false;
     public static final int kLOCALHOST_COUNT_OF_TESTS = 0;
-    public static final boolean kDO_DEMO_NUXEO_COM = false;//false;
+
+    public static final boolean kDO_CMISTEST_REMOTEAWS = true;
+    public static final int kCMISTEST_REMOTEAWS_COUNT_OF_TESTS = 0;
+
+    public static final boolean kDO_DEMO_NUXEO_COM = false;
     public static final int kDEMO_NUXEO_COM_COUNT_OF_TESTS = 2;//50;
 
-    public static final boolean kLOCAL_ONETHREAD_N_MINUTES = true;//true;
+    public static final boolean kLOCAL_ONETHREAD_N_MINUTES = false;
     public static final int k_ONETHREAD_N_MINUTES_DURATION = 30; //Minutes
     public static final int k_ONETHREAD_N_MINUTES_LOG_EVERY = 5; //seconds
-    public static final int k_ONETHREAD_N_MINUTES_SLEEP_N_MS = 0;// every k_ONETHREAD_N_MINUTES_LOG_EVERY
+    public static final int k_ONETHREAD_N_MINUTES_SLEEP_N_MS = 250;// every k_ONETHREAD_N_MINUTES_LOG_EVERY. To let the network have a pause
 
     public static int _RandomInt(int inMin, int inMax) {
         // No error check here
@@ -130,7 +137,7 @@ public class TheMainApp {
         }
 */
 
-        if(!kDO_LOCALHOST && !kDO_DEMO_NUXEO_COM && !kLOCAL_ONETHREAD_N_MINUTES) {
+        if(!kDO_LOCALHOST && !kDO_DEMO_NUXEO_COM && !kLOCAL_ONETHREAD_N_MINUTES && !kDO_CMISTEST_REMOTEAWS) {
             System.out.println("Hmmmm. Basically, you are testing nothing, all main test are set to false");
         }
 
@@ -141,19 +148,25 @@ public class TheMainApp {
         }
 
         if(kDO_LOCALHOST) {
-            System.out.println("<test_on_localhost>");
-            testOnLocalHost();
-            System.out.println("</test_on_localhost>");
+            System.out.println("START OF TEST ON LOCAL HOST");
+            basicTest(kSESSION_FOR_LOCALHOST, kLOCALHOST_COUNT_OF_TESTS);
+            System.out.println("END OF TEST ON LOCAL HOST");
+        }
+
+        if(kDO_CMISTEST_REMOTEAWS) {
+            System.out.println("START OF TEST ON REMOTE AWS");
+            basicTest(kSESSION_FOR_CMISTEST_REMOTEAWS, kCMISTEST_REMOTEAWS_COUNT_OF_TESTS);
+            System.out.println("END OF TEST ON REMOTE AWS");
         }
 
         if(kDO_DEMO_NUXEO_COM) {
-            System.out.println("<test_on_nuxeo_demo_com>");
+            System.out.println("START OF TEST ON demo.nuxeo.com");
             testOnDemoNuxeoCom();
-            System.out.println("</test_on_nuxeo_demo_com>");
+            System.out.println("END OF TEST ON demo.nuxeo.com");
         }
     }
 
-    private static long do_queryForName(Session inSession, String inDocName, boolean inDoLog, boolean inIsDemoNuxeoCom) {
+    private static long do_queryForName(Session inSession, String inDocName, boolean inDoLog, int inSessionKind) {
         long start, result;
         CmisObject doc= null;
         boolean needCloseSession = false;
@@ -161,7 +174,7 @@ public class TheMainApp {
         start = System.currentTimeMillis();
 
         if(inSession == null) {
-            inSession = do_GetSession(inIsDemoNuxeoCom);
+            inSession = do_GetSession(inSessionKind);
             needCloseSession = true;
             System.out.println("Session created");
         }
@@ -195,14 +208,14 @@ public class TheMainApp {
         return result;
     }
 
-    private static long do_queryUsing_getObjectByPath(Session inSession, String inPath, boolean inDoLog, boolean inIsDemoNuxeoCom) {
+    private static long do_queryUsing_getObjectByPath(Session inSession, String inPath, boolean inDoLog, int inSessionKind) {
         long start, result;
         CmisObject doc= null;
         boolean needCloseSession = false;
 
         start = System.currentTimeMillis();
         if(inSession == null) {
-            inSession = do_GetSession(inIsDemoNuxeoCom);
+            inSession = do_GetSession(inSessionKind);
             needCloseSession = true;
         }
         doc =inSession.getObjectByPath(inPath);
@@ -219,15 +232,26 @@ public class TheMainApp {
         return result;
     }
 
-    private static Session do_GetSession(boolean inDemoNuxeoCom) {
+    private static Session do_GetSession(int inKind) {
         SessionFactory factory = SessionFactoryImpl.newInstance();
         Map<String, String> parameter = new HashMap<String, String>();
         parameter.put(SessionParameter.USER, "Administrator");
         parameter.put(SessionParameter.PASSWORD, "Administrator");
-        if(inDemoNuxeoCom) {
-            parameter.put(SessionParameter.ATOMPUB_URL, "http://cmis.demo.nuxeo.org/nuxeo/atom/cmis");
-        } else {
+        switch (inKind) {
+        case kSESSION_FOR_LOCALHOST:
             parameter.put(SessionParameter.ATOMPUB_URL, "http://localhost:8080/nuxeo/atom/cmis");
+            break;
+
+        case kSESSION_FOR_CMISTEST_REMOTEAWS:
+            parameter.put(SessionParameter.ATOMPUB_URL, "http://cmistest.cloud.nuxeo.com/nuxeo/atom/cmis");
+            break;
+
+        case kSESSION_FOR_DEMO_NUXEO_COM:
+            parameter.put(SessionParameter.ATOMPUB_URL, "http://cmis.demo.nuxeo.org/nuxeo/atom/cmis");
+            break;
+
+        default:
+            break;
         }
         parameter.put(SessionParameter.BINDING_TYPE,
                 BindingType.ATOMPUB.value());
@@ -273,13 +297,80 @@ public class TheMainApp {
         }
     }
 
-    private static void testOnLocalHost() throws InterruptedException, IOException {
+    private static void basicTest(int inSessionKind, int inCountOfTests) throws InterruptedException, IOException {
         Session session = null;
 
         do_updateDocNamesToUse();
 
         if(kONE_SESSION_FOR_ALL) {
-            session = do_GetSession(false);
+            session = do_GetSession(inSessionKind);
+            session.getDefaultContext().setCacheEnabled(kENABLE_CLIENT_CACHE);
+        }
+
+        long totalQueryName = 0, totalQueryPath = 0;
+        int i;
+        int nbTests = inCountOfTests;
+
+        if(nbTests < 1 || nbTests > _docNamesCountToUse) {
+            nbTests = _docNamesCountToUse;
+        }
+
+        System.out.println("<QUERY_FOR_NAME>");
+        for(i = 0; i < nbTests; i++) {
+            if(kSAME_DOC_FOR_ALL) {
+                totalQueryName += do_queryForName(session, _docNamesToUse[0], false, inSessionKind);
+            } else {
+                totalQueryName += do_queryForName(session, _docNamesToUse[i], false, inSessionKind);
+            }
+            Thread.sleep(1);
+        }
+        System.out.println("</QUERY_FOR_NAME>");
+
+        System.out.println("<QUERY_FOR_PATH>");
+        for(i = 0; i < nbTests; i++) {
+            if(kSAME_DOC_FOR_ALL) {
+                totalQueryPath += do_queryUsing_getObjectByPath(session,
+                        _docPathToUse + _docNamesToUse[0], false, inSessionKind);
+            } else {
+                totalQueryPath += do_queryUsing_getObjectByPath(session,
+                        _docPathToUse + _docNames[i], false, inSessionKind);
+            }
+            //Thread.sleep(1);
+        }
+        System.out.println("</QUERY_FOR_PATH>");
+
+
+        // ==================================================
+        String cacheInfo;
+        if(kONE_SESSION_FOR_ALL) {
+            cacheInfo = session.getDefaultContext().isCacheEnabled() ? "ENABLED" : "NOT ENABLED";
+        } else {
+            cacheInfo = "NOT ENABLED (one session/query)";
+        }
+        System.out.println( String.format("Test on localhost\nAlways the same name/path: %s\n"
+                + "Using one session for: %s\n"
+                + "CMIS Client Cache: %s\n"
+                + "Using dc:title != name: %s\n"
+                + "Query for name: %d iterations, duration=%dms, average=%dms\n"
+                + "Query for path: %d iterations, duration=%dms, average=%dms\n",
+                                kSAME_DOC_FOR_ALL ? "YES" : "NO",
+                                kONE_SESSION_FOR_ALL ? "ALL" : "EACH REQUEST",
+                                cacheInfo,
+                                kUSE_WITH_TITLE_DIFF_NAME ? "YES" : "NO",
+                                        nbTests, totalQueryName, totalQueryName/nbTests,
+                                        nbTests, totalQueryPath, totalQueryPath/nbTests ) );
+    }
+
+    private static void testOnLocalHost() throws InterruptedException, IOException {
+
+        basicTest(kSESSION_FOR_LOCALHOST, kLOCALHOST_COUNT_OF_TESTS);
+
+        Session session = null;
+
+        do_updateDocNamesToUse();
+
+        if(kONE_SESSION_FOR_ALL) {
+            session = do_GetSession(kSESSION_FOR_LOCALHOST);
             session.getDefaultContext().setCacheEnabled(kENABLE_CLIENT_CACHE);
         }
 
@@ -294,9 +385,9 @@ public class TheMainApp {
         System.out.println("<QUERY_FOR_NAME>");
         for(i = 0; i < nbTests; i++) {
             if(kSAME_DOC_FOR_ALL) {
-                totalQueryName += do_queryForName(session, _docNamesToUse[0], false, false);
+                totalQueryName += do_queryForName(session, _docNamesToUse[0], false, kSESSION_FOR_LOCALHOST);
             } else {
-                totalQueryName += do_queryForName(session, _docNamesToUse[i], false, false);
+                totalQueryName += do_queryForName(session, _docNamesToUse[i], false, kSESSION_FOR_LOCALHOST);
             }
             Thread.sleep(1);
         }
@@ -306,10 +397,10 @@ public class TheMainApp {
         for(i = 0; i < nbTests; i++) {
             if(kSAME_DOC_FOR_ALL) {
                 totalQueryPath += do_queryUsing_getObjectByPath(session,
-                        _docPathToUse + _docNamesToUse[0], false, false);
+                        _docPathToUse + _docNamesToUse[0], false, kSESSION_FOR_LOCALHOST);
             } else {
                 totalQueryPath += do_queryUsing_getObjectByPath(session,
-                        _docPathToUse + _docNames[i], false, false);
+                        _docPathToUse + _docNames[i], false, kSESSION_FOR_LOCALHOST);
             }
             //Thread.sleep(1);
         }
@@ -346,13 +437,13 @@ public class TheMainApp {
         Session session = null;
 
         if(kONE_SESSION_FOR_ALL) {
-            session = do_GetSession(true);
+            session = do_GetSession(kSESSION_FOR_DEMO_NUXEO_COM);
             session.getDefaultContext().setCacheEnabled(kENABLE_CLIENT_CACHE);
         }
 
         System.out.println("<QUERY_FOR_NAME>");
         for(i = 0; i < kDEMO_NUXEO_COM_COUNT_OF_TESTS; i++) {
-            totalQueryName += do_queryForName(session, "project_report.xls", false, true);
+            totalQueryName += do_queryForName(session, "project_report.xls", false, kSESSION_FOR_DEMO_NUXEO_COM);
         }
         System.out.println("</QUERY_FOR_NAME>");
 
@@ -360,7 +451,7 @@ public class TheMainApp {
         for(i = 0; i < kDEMO_NUXEO_COM_COUNT_OF_TESTS; i++) {
             totalQueryPath += do_queryUsing_getObjectByPath(session,
                     "/default-domain/workspaces/IT Department/Projects/Database Creation/Documentation/project_report.xls",
-                    false, true);
+                    false, kSESSION_FOR_DEMO_NUXEO_COM);
         }
         System.out.println("</QUERY_FOR_PATH>");
 
@@ -382,7 +473,6 @@ public class TheMainApp {
     }
 
 
-
     private static void testOnLocalHost1ThreadNMinutes(int inDurationMinutes,
                                                         int logInfosEveryNSeconds) throws InterruptedException {
         Session session = null;
@@ -400,7 +490,7 @@ public class TheMainApp {
 
         do_updateDocNamesToUse();
 
-        session = do_GetSession(false);
+        session = do_GetSession(kSESSION_FOR_LOCALHOST);
         session.getDefaultContext().setCacheEnabled(kENABLE_CLIENT_CACHE);
 
         System.out.println( String.format("START\nDuration (minutes)\t%d\nLog every (seconds)\t%d\nSession shared\tYES\nClient Cache\t%s",
@@ -418,10 +508,10 @@ public class TheMainApp {
             do {
                 subCount += 1;
 
-                subTotalQueryName += do_queryForName(session, _docNamesToUse[ _RandomInt(0, _docNamesMaxForRandom) ], false, false);
+                subTotalQueryName += do_queryForName(session, _docNamesToUse[ _RandomInt(0, _docNamesMaxForRandom) ], false, kSESSION_FOR_LOCALHOST);
                 subTotalQueryPath += do_queryUsing_getObjectByPath(session,
                                                 _docPathToUse + _docNamesToUse[ _RandomInt(0, _docNamesMaxForRandom) ],
-                                                false, false);
+                                                false, kSESSION_FOR_LOCALHOST);
 
                 if(k_ONETHREAD_N_MINUTES_SLEEP_N_MS > 0) {
                     Thread.sleep(k_ONETHREAD_N_MINUTES_SLEEP_N_MS);
