@@ -16,6 +16,17 @@ This is a quick and dirty sample java application. Just open it from Eclipse and
 * Run
 * Check the output to get the results
 
+###Create the executable jar from eclipse
+* You can create sopme jars with different settings for the testing.
+* "File" -> "Export" -> "Runnable jar File"
+* (select the confguration? Easiest way: When you first ran your app, for test, your selected "Java Application" and eclipse create a default configuration. Use it)
+* Select "Package required libraries into generated jar"
+* Export
+* To execute it:
+
+cd the/firectory/of/the/jar
+java -jar yourjar.jar
+
 ## About Nuxeo
 
 Nuxeo provides a modular, extensible Java-based [open source software platform for enterprise content management](http://www.nuxeo.com/en/products/ep) and packaged applications for [document management](http://www.nuxeo.com/en/products/document-management), [digital asset management](http://www.nuxeo.com/en/products/dam) and [case management](http://www.nuxeo.com/en/products/case-management). Designed by developers for developers, the Nuxeo platform offers a modern architecture, a powerful plug-in model and extensive packaging capabilities for building content applications.
