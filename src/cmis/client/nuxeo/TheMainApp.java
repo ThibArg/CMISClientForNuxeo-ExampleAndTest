@@ -1,5 +1,5 @@
 /*
- * IMPORTANT: This Java application is put on GitHib mainly for backup purpose :->
+ * IMPORTANT: This Java application is put on GitHub mainly for backup purpose :->
  *
  * The goal is to check the speed of some CMIS requests to Nuxeo, because we had
  * a question (on answers.nuxeo.com) on this topic, with somebody having performance
@@ -40,6 +40,7 @@
 
 package cmis.client.nuxeo;
 
+import java.io.IOException;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -58,6 +59,18 @@ import org.apache.chemistry.opencmis.commons.enums.BindingType;
 
 public class TheMainApp {
 
+    private static String [] _docNames = null;
+    private static int _docNamesCount = -1;
+    private static int _docNamesMaxForRandom = -1;
+
+    private static String [] _docNamesRenamed = null;
+    private static int _docNamesRenamedCount = -1;
+
+    private static String [] _docNamesToUse = null;
+    private static int _docNamesCountToUse = 0;
+
+    private static String _docPathToUse = "";
+
     /*  Simple example for parsing the result set
     ItemIterable<QueryResult> results = session.query("SELECT dc:title FROM cmis:document where dc:title <> 'file-0-0", true);
     for(QueryResult hit: results) {
@@ -72,18 +85,59 @@ public class TheMainApp {
 
     public static final boolean kSAME_DOC_FOR_ALL = false;
     public static final boolean kONE_SESSION_FOR_ALL = true;
-    public static final boolean kENABLE_CLIENT_CACHE = true; // ignored if kONE_SESSION_FOR_ALL is false
+    public static final boolean kENABLE_CLIENT_CACHE = false; // ignored if kONE_SESSION_FOR_ALL is false
+    public static final boolean kUSE_WITH_TITLE_DIFF_NAME = false; // dc:title == or != name
 
-    public static final boolean kDO_LOCALHOST = true;
-    public static final boolean kDO_DEMO_NUXEO_COM = false;
-    public static final int kDEMO_NUXEO_COM_COUNT_OF_TESTS = 50;
+    public static final boolean kDO_LOCALHOST = false;//true;
+    public static final int kLOCALHOST_COUNT_OF_TESTS = 0;
+    public static final boolean kDO_DEMO_NUXEO_COM = false;//false;
+    public static final int kDEMO_NUXEO_COM_COUNT_OF_TESTS = 2;//50;
 
-    public static void main(String[] args) throws InterruptedException {
+    public static final boolean kLOCAL_ONETHREAD_N_MINUTES = true;//true;
+    public static final int k_ONETHREAD_N_MINUTES_DURATION = 30; //Minutes
+    public static final int k_ONETHREAD_N_MINUTES_LOG_EVERY = 5; //seconds
+    public static final int k_ONETHREAD_N_MINUTES_SLEEP_N_MS = 0;// every k_ONETHREAD_N_MINUTES_LOG_EVERY
+
+    public static int _RandomInt(int inMin, int inMax) {
+        // No error check here
+        return inMin + (int)(Math.random() * ((inMax - inMin) + 1));
+    }
+
+    public static void main(String[] args) throws InterruptedException, IOException {
 
         do_buildDocNames();
 
-        if(!kDO_LOCALHOST && !kDO_DEMO_NUXEO_COM) {
-            System.out.println("Hmmmm. Basically, you are testing nothing: kDO_LOCALHOST and kDO_DEMO_NUXEO_COM are false");
+
+/*
+        CmisObject doc= null;
+        Session session = do_GetSession(false);
+        long start = System.currentTimeMillis();
+        ItemIterable<QueryResult> results = session.query(
+                "SELECT cmis:objectId FROM cmis:document WHERE cmis:name='file-0-3'",
+                true);
+        Iterator<QueryResult> it = results.iterator();
+        if(it.hasNext()) {
+            QueryResult r = it.next();
+            PropertyData<?> idProp = r.getPropertyByQueryName("cmis:objectId");
+            String id = (String) idProp.getFirstValue();
+            doc = session.getObject( id );
+        } else {
+            System.out.println("_queryForName: Doc <file-0-3> not found.");
+        }
+        System.out.println("alors?..." + (System.currentTimeMillis() - start));
+        if(true) {
+            return;
+        }
+*/
+
+        if(!kDO_LOCALHOST && !kDO_DEMO_NUXEO_COM && !kLOCAL_ONETHREAD_N_MINUTES) {
+            System.out.println("Hmmmm. Basically, you are testing nothing, all main test are set to false");
+        }
+
+
+        if(kLOCAL_ONETHREAD_N_MINUTES) {
+            testOnLocalHost1ThreadNMinutes(k_ONETHREAD_N_MINUTES_DURATION, k_ONETHREAD_N_MINUTES_LOG_EVERY);
+            return;
         }
 
         if(kDO_LOCALHOST) {
@@ -109,6 +163,7 @@ public class TheMainApp {
         if(inSession == null) {
             inSession = do_GetSession(inIsDemoNuxeoCom);
             needCloseSession = true;
+            System.out.println("Session created");
         }
 
         ItemIterable<QueryResult> results = inSession.query(
@@ -184,24 +239,44 @@ public class TheMainApp {
         return session;
     }
 
-    private static String [] _docNames = null;
-    private static int _docNamesCount = -1;
     public static void do_buildDocNames() {
         if(_docNames == null) {
             _docNamesCount = 7 * 16;
+            _docNamesMaxForRandom = _docNamesCount - 1;
             _docNames = new String[ _docNamesCount ];
-            int i = 0, j = 0, idx = 0;
+
+            _docNamesRenamedCount = _docNamesCount;
+            _docNamesRenamed = new String[_docNamesRenamedCount];
+
+            int i = 0, j = 0, idx = 0, idx2 = 0;
 
             for(i = 0; i <= 6; i++) {
                 for(j = 0; j <= 15; j++) {
-                    _docNames[idx++] = "file-" + i + "-" + j;
+                    _docNames[idx++] = "file-" + i + "-" + j + ".pdf";
+                    _docNamesRenamed[idx2++] = "file-" + i + "-" + j + "-r.pdf";
                 }
             }
         }
     }
 
-    private static void testOnLocalHost() throws InterruptedException {
+    private static void do_updateDocNamesToUse() {
+        if(kUSE_WITH_TITLE_DIFF_NAME) {
+            _docNamesToUse = _docNamesRenamed;
+            _docNamesCountToUse = _docNamesRenamedCount;
+            _docPathToUse = "/default-domain/workspaces/ws/random-import/renamed/";
+
+        } else {
+            _docNamesToUse = _docNames;
+            _docNamesCountToUse = _docNamesCount;
+            //_docPathToUse = "/default-domain/workspaces/ws/CMIS-Test-ToImport/aThe102Docs/";
+            _docPathToUse = "/default-domain/workspaces/ws/a/";
+        }
+    }
+
+    private static void testOnLocalHost() throws InterruptedException, IOException {
         Session session = null;
+
+        do_updateDocNamesToUse();
 
         if(kONE_SESSION_FOR_ALL) {
             session = do_GetSession(false);
@@ -210,33 +285,33 @@ public class TheMainApp {
 
         long totalQueryName = 0, totalQueryPath = 0;
         int i;
-        int kMAX_TESTS = _docNamesCount;
+        int nbTests = kLOCALHOST_COUNT_OF_TESTS;
 
-        if(kMAX_TESTS > _docNamesCount) {
-            kMAX_TESTS = _docNamesCount;
+        if(nbTests < 1 || nbTests > _docNamesCountToUse) {
+            nbTests = _docNamesCountToUse;
         }
 
         System.out.println("<QUERY_FOR_NAME>");
-        for(i = 0; i < kMAX_TESTS; i++) {
+        for(i = 0; i < nbTests; i++) {
             if(kSAME_DOC_FOR_ALL) {
-                totalQueryName += do_queryForName(session, _docNames[0], false, false);
+                totalQueryName += do_queryForName(session, _docNamesToUse[0], false, false);
             } else {
-                totalQueryName += do_queryForName(session, _docNames[i], false, false);
+                totalQueryName += do_queryForName(session, _docNamesToUse[i], false, false);
             }
             Thread.sleep(1);
         }
         System.out.println("</QUERY_FOR_NAME>");
 
         System.out.println("<QUERY_FOR_PATH>");
-        for(i = 0; i < kMAX_TESTS; i++) {
+        for(i = 0; i < nbTests; i++) {
             if(kSAME_DOC_FOR_ALL) {
                 totalQueryPath += do_queryUsing_getObjectByPath(session,
-                        "/default-domain/workspaces/ws/random-import/other/" + _docNames[0], false, false);
+                        _docPathToUse + _docNamesToUse[0], false, false);
             } else {
                 totalQueryPath += do_queryUsing_getObjectByPath(session,
-                        "/default-domain/workspaces/ws/random-import/other/" + _docNames[i], false, false);
+                        _docPathToUse + _docNames[i], false, false);
             }
-            Thread.sleep(1);
+            //Thread.sleep(1);
         }
         System.out.println("</QUERY_FOR_PATH>");
 
@@ -251,18 +326,22 @@ public class TheMainApp {
         System.out.println( String.format("Test on localhost\nAlways the same name/path: %s\n"
                 + "Using one session for: %s\n"
                 + "CMIS Client Cache: %s\n"
+                + "Using dc:title != name: %s\n"
                 + "Query for name: %d iterations, duration=%dms, average=%dms\n"
                 + "Query for path: %d iterations, duration=%dms, average=%dms\n",
                                 kSAME_DOC_FOR_ALL ? "YES" : "NO",
                                 kONE_SESSION_FOR_ALL ? "ALL" : "EACH REQUEST",
                                 cacheInfo,
-                                kMAX_TESTS, totalQueryName, totalQueryName/kMAX_TESTS,
-                                kMAX_TESTS, totalQueryPath, totalQueryPath/kMAX_TESTS ) );
+                                kUSE_WITH_TITLE_DIFF_NAME ? "YES" : "NO",
+                                        nbTests, totalQueryName, totalQueryName/nbTests,
+                                        nbTests, totalQueryPath, totalQueryPath/nbTests ) );
     }
 
     private static void testOnDemoNuxeoCom() {
         long totalQueryName = 0, totalQueryPath = 0;
         int i;
+
+        do_updateDocNamesToUse();
 
         Session session = null;
 
@@ -300,5 +379,82 @@ public class TheMainApp {
                                 cacheInfo,
                                 kDEMO_NUXEO_COM_COUNT_OF_TESTS, totalQueryName, totalQueryName/kDEMO_NUXEO_COM_COUNT_OF_TESTS,
                                 kDEMO_NUXEO_COM_COUNT_OF_TESTS, totalQueryPath, totalQueryPath/kDEMO_NUXEO_COM_COUNT_OF_TESTS ) );
+    }
+
+
+
+    private static void testOnLocalHost1ThreadNMinutes(int inDurationMinutes,
+                                                        int logInfosEveryNSeconds) throws InterruptedException {
+        Session session = null;
+        long msStart, msEnd,
+             totalLimit,
+             countOfIterations = 0,
+             numberOfQueries = 0, totalDurationQueryName = 0, totalDurationQueryPath = 0;
+
+        if(inDurationMinutes <= 0) {
+            inDurationMinutes = 30;
+        }
+        if(logInfosEveryNSeconds <= 0) {
+            logInfosEveryNSeconds = 30;
+        }
+
+        do_updateDocNamesToUse();
+
+        session = do_GetSession(false);
+        session.getDefaultContext().setCacheEnabled(kENABLE_CLIENT_CACHE);
+
+        System.out.println( String.format("START\nDuration (minutes)\t%d\nLog every (seconds)\t%d\nSession shared\tYES\nClient Cache\t%s",
+                inDurationMinutes,
+                logInfosEveryNSeconds,
+                session.getDefaultContext().isCacheEnabled() ? "ENABLED" : "NOT ENABLED") );
+
+        System.out.println("With pause for " + k_ONETHREAD_N_MINUTES_SLEEP_N_MS + "ms");
+        System.out.println( "Iteration\tElapsed time (s)\tCount\tName\tPath");
+        msStart = System.currentTimeMillis();
+        totalLimit = System.currentTimeMillis() + (inDurationMinutes * 60 * 1000);
+        do {
+            long durationMax = System.currentTimeMillis() + (logInfosEveryNSeconds * 1000);
+            int subTotalQueryName = 0, subTotalQueryPath = 0, subCount = 0;
+            do {
+                subCount += 1;
+
+                subTotalQueryName += do_queryForName(session, _docNamesToUse[ _RandomInt(0, _docNamesMaxForRandom) ], false, false);
+                subTotalQueryPath += do_queryUsing_getObjectByPath(session,
+                                                _docPathToUse + _docNamesToUse[ _RandomInt(0, _docNamesMaxForRandom) ],
+                                                false, false);
+
+                if(k_ONETHREAD_N_MINUTES_SLEEP_N_MS > 0) {
+                    Thread.sleep(k_ONETHREAD_N_MINUTES_SLEEP_N_MS);
+                }
+
+            } while(System.currentTimeMillis() < durationMax);
+
+            countOfIterations += 1;
+            System.out.println( String.format("%d\t%d\t%d\t%d\t%d",
+                                                countOfIterations,
+                                                (int) ((System.currentTimeMillis() - msStart) / 1000),
+                                                subCount,
+                                                subTotalQueryName / subCount,
+                                                subTotalQueryPath / subCount));
+
+            numberOfQueries += subCount;
+            totalDurationQueryName += subTotalQueryName;
+            totalDurationQueryPath += subTotalQueryPath;
+
+        } while(System.currentTimeMillis() < totalLimit);
+
+        msEnd = System.currentTimeMillis() - msStart;
+
+
+        // ==================================================
+        System.out.println( String.format("Test on localhost\n"
+                + "Duration\t%ds\n"
+                + "Number of queries (each test)\t%s\n"
+                + "Query for name AVG\t%dms\n"
+                + "Query for path AVG\t%dms\n",
+                            (int) (msEnd/1000),
+                            numberOfQueries,
+                            (int) (totalDurationQueryName / numberOfQueries),
+                            (int) (totalDurationQueryPath / numberOfQueries) ));
     }
 }
